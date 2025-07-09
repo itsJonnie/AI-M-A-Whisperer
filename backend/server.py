@@ -29,7 +29,35 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 
-# Define Models
+# Define Models for M&A Analysis
+class StartupInput(BaseModel):
+    startup_name: str
+    description: str
+    pitch_deck_images: Optional[List[str]] = []  # Base64 encoded images
+
+class AcquirerInfo(BaseModel):
+    name: str
+    fit_percentage: int
+    strategic_reasons: List[str]
+
+class AnalysisResult(BaseModel):
+    top_acquirers: List[AcquirerInfo]
+    strategic_fit_summary: List[str]
+    valuation_range: dict  # {"min": 10000000, "max": 50000000, "currency": "USD"}
+    confidence_score: float
+    analysis_timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class StartupAnalysis(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    startup_name: str
+    description: str
+    pitch_deck_images: Optional[List[str]] = []
+    analysis_result: Optional[AnalysisResult] = None
+    status: str = "pending"  # pending, analyzing, completed, error
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Existing models
 class StatusCheck(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_name: str
