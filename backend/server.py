@@ -66,7 +66,165 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
-# Add your routes to the router instead of directly to app
+# Placeholder function for LLM-powered M&A analysis
+async def analyze_startup_with_llm(startup_name: str, description: str, images: List[str]) -> AnalysisResult:
+    """
+    Placeholder function for LLM-powered M&A analysis.
+    In production, this would integrate with an LLM service to analyze the startup
+    and provide acquisition recommendations.
+    """
+    # Mock analysis results for demonstration
+    mock_acquirers = [
+        AcquirerInfo(
+            name="Microsoft",
+            fit_percentage=85,
+            strategic_reasons=[
+                "Strong alignment with Azure cloud services",
+                "Complementary technology stack",
+                "Potential for enterprise customer cross-selling"
+            ]
+        ),
+        AcquirerInfo(
+            name="Google",
+            fit_percentage=78,
+            strategic_reasons=[
+                "Enhanced AI/ML capabilities",
+                "Strategic fit with Google Cloud platform",
+                "Opportunity to strengthen developer tools"
+            ]
+        ),
+        AcquirerInfo(
+            name="Amazon",
+            fit_percentage=72,
+            strategic_reasons=[
+                "AWS integration opportunities",
+                "Expansion of service offerings",
+                "Competitive advantage in cloud market"
+            ]
+        )
+    ]
+    
+    mock_strategic_fit = [
+        "Strong technical team with proven track record",
+        "Scalable technology platform with growth potential",
+        "Established customer base in target market",
+        "Intellectual property portfolio with competitive advantages"
+    ]
+    
+    # Simple valuation estimate (in practice, this would be much more sophisticated)
+    base_valuation = len(description) * 100000  # Very basic mock calculation
+    valuation_range = {
+        "min": base_valuation,
+        "max": base_valuation * 3,
+        "currency": "USD"
+    }
+    
+    return AnalysisResult(
+        top_acquirers=mock_acquirers,
+        strategic_fit_summary=mock_strategic_fit,
+        valuation_range=valuation_range,
+        confidence_score=0.73
+    )
+
+# M&A Analysis endpoints
+@api_router.post("/analyze", response_model=StartupAnalysis)
+async def analyze_startup(startup_input: StartupInput):
+    """
+    Analyze a startup for M&A opportunities.
+    This endpoint processes the startup information and returns analysis results.
+    """
+    try:
+        # Create analysis record
+        analysis = StartupAnalysis(
+            startup_name=startup_input.startup_name,
+            description=startup_input.description,
+            pitch_deck_images=startup_input.pitch_deck_images or [],
+            status="analyzing"
+        )
+        
+        # Store initial analysis record
+        await db.startup_analyses.insert_one(analysis.dict())
+        
+        # Perform analysis (placeholder for LLM integration)
+        analysis_result = await analyze_startup_with_llm(
+            startup_input.startup_name,
+            startup_input.description,
+            startup_input.pitch_deck_images or []
+        )
+        
+        # Update analysis with results
+        analysis.analysis_result = analysis_result
+        analysis.status = "completed"
+        analysis.updated_at = datetime.utcnow()
+        
+        # Update in database
+        await db.startup_analyses.update_one(
+            {"id": analysis.id},
+            {"$set": analysis.dict()}
+        )
+        
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error analyzing startup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@api_router.get("/analysis/{analysis_id}", response_model=StartupAnalysis)
+async def get_analysis(analysis_id: str):
+    """
+    Retrieve analysis results by ID.
+    """
+    try:
+        analysis = await db.startup_analyses.find_one({"id": analysis_id})
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        return StartupAnalysis(**analysis)
+        
+    except Exception as e:
+        logger.error(f"Error retrieving analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve analysis: {str(e)}")
+
+@api_router.get("/analyses", response_model=List[StartupAnalysis])
+async def get_all_analyses():
+    """
+    Retrieve all startup analyses.
+    """
+    try:
+        analyses = await db.startup_analyses.find().to_list(1000)
+        return [StartupAnalysis(**analysis) for analysis in analyses]
+        
+    except Exception as e:
+        logger.error(f"Error retrieving analyses: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve analyses: {str(e)}")
+
+@api_router.post("/upload-image")
+async def upload_pitch_deck_image(file: UploadFile = File(...)):
+    """
+    Upload a pitch deck image and return base64 encoded string.
+    """
+    try:
+        # Validate file type
+        if not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read file content
+        contents = await file.read()
+        
+        # Convert to base64
+        base64_image = base64.b64encode(contents).decode('utf-8')
+        
+        return {
+            "success": True,
+            "image_data": f"data:{file.content_type};base64,{base64_image}",
+            "filename": file.filename
+        }
+        
+    except Exception as e:
+        logger.error(f"Error uploading image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+
+# Existing endpoints
 @api_router.get("/")
 async def root():
     return {"message": "Hello World"}
