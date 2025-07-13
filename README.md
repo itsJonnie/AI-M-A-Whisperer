@@ -40,3 +40,7 @@ Use these templates:
 ```env
 OPENAI_API_KEY=your-openai-key
 DEBUG=true
+
+### To Do:
+* Get GPT API integration to work seamlessly
+
